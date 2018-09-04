@@ -1,7 +1,5 @@
 ## Writeup Template
 
-### You can use this file as a template for your writeup if you want to submit it as a markdown file, but feel free to use some other method and submit a pdf if you prefer.
-
 ---
 
 **Advanced Lane Finding Project**
@@ -19,13 +17,7 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 
-[image1]: ./examples/undistort_output.png "Undistorted"
-[image2]: ./test_images/test1.jpg "Road Transformed"
-[image3]: ./examples/binary_combo_example.jpg "Binary Example"
-[image4]: ./examples/warped_straight_lines.jpg "Warp Example"
-[image5]: ./examples/color_fit_lines.jpg "Fit Visual"
-[image6]: ./examples/example_output.jpg "Output"
-[video1]: ./project_video.mp4 "Video"
+[image1]: ./output_images/camera_calibration/calibration7.jpg
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
 
@@ -43,72 +35,75 @@ You're reading it!
 
 #### 1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
 
-The code for this step is contained in the first code cell of the IPython notebook located in "./examples/example.ipynb" (or in lines # through # of the file called `some_file.py`).  
+The camera calibration code is written up in `camera_calibration.py`
 
-I start by preparing "object points", which will be the (x, y, z) coordinates of the chessboard corners in the world. Here I am assuming the chessboard is fixed on the (x, y) plane at z=0, such that the object points are the same for each calibration image.  Thus, `objp` is just a replicated array of coordinates, and `objpoints` will be appended with a copy of it every time I successfully detect all chessboard corners in a test image.  `imgpoints` will be appended with the (x, y) pixel position of each of the corners in the image plane with each successful chessboard detection.  
+I open each file (chessboard images) in the camera_cal directory. I detect the chessboard corners to be used as the image points as shown here. 
 
-I then used the output `objpoints` and `imgpoints` to compute the camera calibration and distortion coefficients using the `cv2.calibrateCamera()` function.  I applied this distortion correction to the test image using the `cv2.undistort()` function and obtained this result: 
+![](/output_images/camera_calibration/calibration7.jpg){:width="200px"}
 
-![alt text][image1]
 
 ### Pipeline (single images)
 
 #### 1. Provide an example of a distortion-corrected image.
 
-To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
-![alt text][image2]
+Using the object and image points I calibrate the camera and save its data in a pickle file `calibration_pickle.p`
+
+![](/test_images/test6.jpg){:width="200px"} ![](/output_images/undistorted_images/test6.jpg){:width="200px"} 
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `another_file.py`).  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
+I defined two functions abs_sobel_threshold() and color_threshold() at the beginning of the file `image_generation.py`. I am using both x and y gradient thresholds and HLS + HSV thresholds in lines 64 - 68. Here is one of the binary images:
 
-![alt text][image3]
+![](/output_images/binary_images/test3.jpg){:width="200px"}
 
 #### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
-The code for my perspective transform includes a function called `warper()`, which appears in lines 1 through 8 in the file `example.py` (output_images/examples/example.py) (or, for example, in the 3rd code cell of the IPython notebook).  The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
+This is my perspective transform code:
 
 ```python
-src = np.float32(
-    [[(img_size[0] / 2) - 55, img_size[1] / 2 + 100],
-    [((img_size[0] / 6) - 10), img_size[1]],
-    [(img_size[0] * 5 / 6) + 60, img_size[1]],
-    [(img_size[0] / 2 + 55), img_size[1] / 2 + 100]])
-dst = np.float32(
-    [[(img_size[0] / 4), 0],
-    [(img_size[0] / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), 0]])
+img_size = (img.shape[1], img.shape[0])
+trap_height_pct = .62
+middle_trap_width_pct = .08
+bottom_trap_width_pct = .76
+avoid_hood_height_pct = .935
+
+src = np.float32([[img_size[0] * (.5 - middle_trap_width_pct / 2), img_size[1] * trap_height_pct],
+                    [img_size[0] * (.5 + middle_trap_width_pct / 2), img_size[1] * trap_height_pct],
+                    [img_size[0] * (.5 + bottom_trap_width_pct / 2), img_size[1] * avoid_hood_height_pct],
+                    [img_size[0] * (.5 - bottom_trap_width_pct / 2), img_size[1] * avoid_hood_height_pct]])
+offset = img_size[0] * .25
+dest = np.float32([[offset, 0], [img_size[0] - offset, 0], [img_size[0] - offset, img_size[1]],
+                    [offset, img_size[1]]])
+
+m = cv2.getPerspectiveTransform(src, dest)
+m_inv = cv2.getPerspectiveTransform(dest, src)
+warped = cv2.warpPerspective(processedImage, m, img_size, flags=cv2.INTER_LINEAR)
 ```
 
-This resulted in the following source and destination points:
+I experimented and manually defined a trapezoid area of interest in the middle of the original image which corresponds to a rectangle area in the warped image. I also trimmed a small area at the bottom to crop the car's hood from the image. The results were satisfactory.
 
-| Source        | Destination   | 
-|:-------------:|:-------------:| 
-| 585, 460      | 320, 0        | 
-| 203, 720      | 320, 720      |
-| 1127, 720     | 960, 720      |
-| 695, 460      | 960, 0        |
+![](/output_images/warped_images/test2.jpg){:width="200px"}
 
-I verified that my perspective transform was working as expected by drawing the `src` and `dst` points onto a test image and its warped counterpart to verify that the lines appear parallel in the warped image.
-
-![alt text][image4]
 
 #### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
-Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
+I have a python class called Slider in `sliding_window.py`. It uses a sliding window logic using a convolution of the window and the vertical slice of the image. I look for peaks in left and right side of the image to detect lane lines.
 
-![alt text][image5]
+The Slider class is used in lines 96 - 165 in `image_generation.py`, specifically lines 141 - 147. I am fitting a second order polynomial curve of this equation: 
+
+<img src="https://latex.codecogs.com/gif.latex?f(y)=Ay&space;2&space;&plus;By&plus;C" title="f(y)=Ay 2 +By+C" />
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-I did this in lines # through # in my code in `my_other_file.py`
+The position was calculated simply in lines 177 - 182 in `image_generation.py` using the variables from the polynomial. The radius of curvature is calculated on line 185 of `image_generation.py` using this formula: 
+
+<img src="https://latex.codecogs.com/gif.latex?R_{curve}&space;=&space;\frac{(1&space;&plus;&space;(2Ay&plus;B)^{2})^{\frac{3}{2}}&space;}{|2A|}" title="R_{curve} = \frac{(1 + (2Ay+B)^{2})^{\frac{3}{2}} }{|2A|}" />
 
 #### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
+All this resulted in the lane lines detected on the original image:
 
-![alt text][image6]
+![](/output_images/final_output/test6.jpg){:width="200px"}
 
 ---
 
@@ -116,7 +111,7 @@ I implemented this step in lines # through # in my code in `yet_another_file.py`
 
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](./output_videos/project_video.mp4)
 
 ---
 
@@ -124,4 +119,11 @@ Here's a [link to my video result](./project_video.mp4)
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+The pipeline worked well on the project video, but it didn't fare so well on the challenge videos. The main reasons for this:
+
+1. I am only considering the trapezoid area for lane lines. When there is a sharp curve (like in harder_challenge_video), they don't get detected.
+2. The color of the road is changing in the middle of the lane in the challenge_video. This is messing up the lane detections.
+3. Other motorists coming in your lane may be causing a few issues.
+
+Perhaps using a inverted trapezoid (starting from the car's hood and getting widest in the middle of the video) would consider the sharp curves and hopefully the the convolution process for centroid detection would still find the lane lines among the extra noise added.
+
